@@ -1,0 +1,2 @@
+bootloader.c:21:6:save_flash_nolib	56	dynamic
+bootloader.c:83:6:read_flash_bin	8	static
