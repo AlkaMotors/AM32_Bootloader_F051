@@ -509,10 +509,8 @@ int main(void)
   MX_GPIO_INPUT_INIT();     // init the pin with a pulldown
 
   LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_DOWN);
-
-
-  for(int i = 0 ; i < 10000; i ++){
-	 if( !(input_port->IDR & input_pin)){
+   for(int i = 0 ; i < 1000; i ++){
+	 if( !(input_port->IDR & input_pin)){  // if the pin is low
 		 jump();
 	 }
 	  delayMicroseconds(10);
