@@ -1,4 +1,4 @@
-/* Bootloader Version 5 */
+/* Bootloader Version 6 */
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -253,6 +253,12 @@ void decodeInput(){
 					return;
 				}
 		}
+
+	if(cmd == CMD_RUN){         // starts the main app
+		if((rxBuffer[1] == 0) && (rxBuffer[2] == 0) && (rxBuffer[3] == 0)){
+		invalid_command = 101;
+		}
+	}
 
 	if(cmd == CMD_PROG_FLASH){
 		len = 2;
@@ -509,8 +515,10 @@ int main(void)
   MX_GPIO_INPUT_INIT();     // init the pin with a pulldown
 
   LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_DOWN);
-   for(int i = 0 ; i < 1000; i ++){
-	 if( !(input_port->IDR & input_pin)){  // if the pin is low
+  delayMicroseconds(1000);
+
+  for(int i = 0 ; i < 1000; i ++){
+	 if( !(input_port->IDR & input_pin)){  // if the pin is low for 100ms straight there is no signal jump to application to beep
 		 jump();
 	 }
 	  delayMicroseconds(10);
@@ -522,7 +530,7 @@ int main(void)
   jump();
 
 #endif
-  sendDeviceInfo();
+//  sendDeviceInfo();
   while (1)
   {
 
