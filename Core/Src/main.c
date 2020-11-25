@@ -1,6 +1,10 @@
-/* Bootloader Version 6 */
+/* Bootloader */
+
+#define BOOTLOADER_VERSION 6
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdbool.h>
+
 #include "main.h"
 
 //#define USE_PB4        // for iflight
@@ -10,12 +14,18 @@
 #include <string.h>
 #include "bootloader.h"
 
+#define STM32_FLASH_START 0x08000000
+#define FIRMWARE_RELATIVE_START 0x1000
+#define EEPROM_RELATIVE_START 0x7c00
+
+uint8_t __attribute__ ((section(".bootloader_info"))) bootloader_version = BOOTLOADER_VERSION;
+
 typedef void (*pFunction)(void);
 
-#define APPLICATION_ADDRESS     (uint32_t)0x08001000               // 4k
+#define APPLICATION_ADDRESS     (uint32_t)(STM32_FLASH_START + FIRMWARE_RELATIVE_START) // 4k
 
-#define EEPROM_START_ADD         (uint32_t)0x08007C00
-#define FLASH_END_ADD           (uint32_t)0x08007FFF               // 32 k
+#define EEPROM_START_ADD         (uint32_t)(STM32_FLASH_START + EEPROM_RELATIVE_START)
+#define FLASH_END_ADD           (uint32_t)(STM32_FLASH_START + 0x7FFF)               // 32 k
 
 
 #define CMD_RUN             0x00
@@ -205,6 +215,9 @@ void sendDeviceInfo(){
 
 }
 
+bool checkAddressWritable(uint32_t address) {
+	return address >= APPLICATION_ADDRESS;
+}
 
 void decodeInput(){
 	if(incoming_payload_no_command){
@@ -224,18 +237,17 @@ void decodeInput(){
 			send_BAD_CRC_ACK();
 			return;
 		}
-
-
 	}
+
 	cmd = rxBuffer[0];
 
 	if(rxBuffer[16] == 0x7d){
-			if(rxBuffer[8] == 13 && rxBuffer[9] == 66){
-				sendDeviceInfo();
-				rxBuffer[20]= 0;
+		if(rxBuffer[8] == 13 && rxBuffer[9] == 66){
+			sendDeviceInfo();
+			rxBuffer[20]= 0;
 
-			}
-			return;
+		}
+		return;
 	}
 
 	if(rxBuffer[20] == 0x7d){
@@ -256,133 +268,142 @@ void decodeInput(){
 
 	if(cmd == CMD_RUN){         // starts the main app
 		if((rxBuffer[1] == 0) && (rxBuffer[2] == 0) && (rxBuffer[3] == 0)){
-		invalid_command = 101;
+			invalid_command = 101;
 		}
 	}
 
 	if(cmd == CMD_PROG_FLASH){
 		len = 2;
-
-		if(checkCrc(rxBuffer,len)){
-			save_flash_nolib((uint8_t*)payLoadBuffer, payload_buffer_size,address);
-			  send_ACK();
-			  return;
-		}else{
+		if (!checkCrc((uint8_t*)rxBuffer, len)) {
 			send_BAD_CRC_ACK();
+
 			return;
 		}
+
+		if (!checkAddressWritable(address)) {
+			send_BAD_ACK();
+
+			return;
+		}
+
+		save_flash_nolib((uint8_t*)payLoadBuffer, payload_buffer_size,address);
+		send_ACK();
+
+	 	return;
 	}
 
 	if(cmd == CMD_SET_ADDRESS){             //  command set addressinput format is: CMD, 00 , High byte address, Low byte address, crclb ,crchb
 		len = 4;  // package without 2 byte crc
-
-		if(checkCrc((uint8_t*)rxBuffer,len)){
-			          // will send Ack 0x30 and read input after transfer out callback
-			invalid_command = 0;
-			if((rxBuffer[2] << 8 | rxBuffer[3]) >= 0x1000){   // make sure its higher than bootloader always
-				if(((rxBuffer[2] << 8 | rxBuffer[3]) == 0x1000) || ((rxBuffer[2] << 8 | rxBuffer[3]) == 0x7c00)){
-				address = 0x08000000 + (rxBuffer[2] << 8 | rxBuffer[3]);
-				send_ACK();
-				return;
-				}else{
-
-
-				if(address + address_expected_increment >= 0x08000000 + (rxBuffer[2] << 8 | rxBuffer[3])){  // ensure it moves in 256 kb increments so no steps are missed
-				address = 0x08000000 + (rxBuffer[2] << 8 | rxBuffer[3]);
-				send_ACK();
-				return;
-				}
-				}
-			}
-		}else{
+		if (!checkCrc((uint8_t*)rxBuffer, len)) {
 			send_BAD_CRC_ACK();
+
 			return;
 		}
 
 
-	}
-	if(cmd == CMD_SET_BUFFER){        // for writing buffer rx buffer 0 = command byte.  command set address, input , format is CMD, 00 , 00 or 01 (if buffer is 256), buffer_size,
-			len = 4;  // package without 2 byte crc
-            if(checkCrc((uint8_t*)rxBuffer,len)){        // no ack with command set buffer;
-            	if(rxBuffer[2] == 0x01){
-            		payload_buffer_size = 256;                          // if nothing in this buffer
-            	}else{
-	         payload_buffer_size = rxBuffer[3];
-            	}
-	         incoming_payload_no_command = 1;
-	         address_expected_increment = 256;
-           setReceive();
-           return;
-          }else{
-  			send_BAD_CRC_ACK();
-  			return;
-  		}
-}
-	if(rxBuffer[0] == CMD_KEEP_ALIVE){
-	len = 2;
-	if(checkCrc((uint8_t*)rxBuffer,len)){
-		   setTransmit();
-		 		serialwriteChar(0xC1);                // bad command message.
-				setReceive();
-				return;
-	}else{
-		send_BAD_CRC_ACK();
+	    // will send Ack 0x30 and read input after transfer out callback
+		invalid_command = 0;
+		address = STM32_FLASH_START + (rxBuffer[2] << 8 | rxBuffer[3]);
+		send_ACK();
+
 		return;
 	}
 
-	}
-	if(cmd == CMD_ERASE_FLASH){
-		len = 2;
-		if(checkCrc((uint8_t*)rxBuffer,len)){
-			send_ACK();
-			return;
-		}else{
+	if(cmd == CMD_SET_BUFFER){        // for writing buffer rx buffer 0 = command byte.  command set address, input , format is CMD, 00 , 00 or 01 (if buffer is 256), buffer_size,
+		len = 4;  // package without 2 byte crc
+		if (!checkCrc((uint8_t*)rxBuffer, len)) {
 			send_BAD_CRC_ACK();
+
 			return;
-		}
 		}
 
+        // no ack with command set buffer;
+       	if(rxBuffer[2] == 0x01){
+       		payload_buffer_size = 256;                          // if nothing in this buffer
+       	}else{
+	        payload_buffer_size = rxBuffer[3];
+        }
+	    incoming_payload_no_command = 1;
+	    address_expected_increment = 256;
+        setReceive();
+
+        return;
+	}
+
+	if(cmd == CMD_KEEP_ALIVE){
+		len = 2;
+		if (!checkCrc((uint8_t*)rxBuffer, len)) {
+			send_BAD_CRC_ACK();
+
+			return;
+		}
+
+	   	setTransmit();
+	 	serialwriteChar(0xC1);                // bad command message.
+		setReceive();
+
+		return;
+	}
+
+	if(cmd == CMD_ERASE_FLASH){
+		len = 2;
+		if (!checkCrc((uint8_t*)rxBuffer, len)) {
+			send_BAD_CRC_ACK();
+
+			return;
+		}
+
+		if (!checkAddressWritable(address)) {
+			send_BAD_ACK();
+
+			return;
+		}
+
+		send_ACK();
+		return;
+	}
+
 	if(cmd == CMD_READ_EEPROM){
-eeprom_req = 1;
+		eeprom_req = 1;
 	}
 
 	if(cmd == CMD_READ_FLASH_SIL){     // for sending contents of flash memory at the memory location set in bootloader.c need to still set memory with data from set mem command
 		len = 2;
+		if (!checkCrc((uint8_t*)rxBuffer, len)) {
+			send_BAD_CRC_ACK();
+
+			return;
+		}
+
 		count++;
 		uint16_t out_buffer_size = rxBuffer[1];//
 		if(out_buffer_size == 0){
 			out_buffer_size = 256;
 		}
 		address_expected_increment = 128;
-		if(checkCrc((uint8_t*)rxBuffer,len)){
-			setTransmit();
-			uint8_t read_data[out_buffer_size + 3];        // make buffer 3 larger to fit CRC and ACK
-			memset(read_data, 0, sizeof(read_data));
+
+		setTransmit();
+		uint8_t read_data[out_buffer_size + 3];        // make buffer 3 larger to fit CRC and ACK
+		memset(read_data, 0, sizeof(read_data));
         //    read_flash((uint8_t*)read_data , address);                 // make sure read_flash reads two less than buffer.
-			read_flash_bin((uint8_t*)read_data , address, out_buffer_size);
+		read_flash_bin((uint8_t*)read_data , address, out_buffer_size);
 
-            makeCrc(read_data,out_buffer_size);
-            read_data[out_buffer_size] = calculated_crc_low_byte;
-            read_data[out_buffer_size + 1] = calculated_crc_high_byte;
-            read_data[out_buffer_size + 2] = 0x30;
-            sendString(read_data, out_buffer_size+3);
+        makeCrc(read_data,out_buffer_size);
+        read_data[out_buffer_size] = calculated_crc_low_byte;
+        read_data[out_buffer_size + 1] = calculated_crc_high_byte;
+        read_data[out_buffer_size + 2] = 0x30;
+        sendString(read_data, out_buffer_size+3);
 
-			setReceive();
+		setReceive();
 
-			return;
-		}else{
-			send_BAD_CRC_ACK();
-			return;
-		}
+		return;
 	}
 
     setTransmit();
- 		serialwriteChar(0xC1);                // bad command message.
-		invalid_command++;
- 		setReceive();
 
-
-
+	serialwriteChar(0xC1);                // bad command message.
+	invalid_command++;
+ 	setReceive();
 }
 
 
@@ -497,7 +518,8 @@ void recieveBuffer(){
 int main(void)
 {
 
-  
+//Prevent warnings
+(void)bootloader_version;
 
   LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_SYSCFG);
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
