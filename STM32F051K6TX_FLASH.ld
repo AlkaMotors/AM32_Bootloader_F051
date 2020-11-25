@@ -37,7 +37,9 @@ _Min_Stack_Size = 0x400 ;	/* required amount of stack */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = 8K
-  FLASH    (rx)    : ORIGIN = 0x8000000,   LENGTH = 32K
+  FLASH_VECTAB  (rx)  : ORIGIN = 0x08000000, LENGTH = 192
+  FLASH_VERSION (rx)  : ORIGIN = 0x080000C0, LENGTH = 1
+  FLASH         (rx)  : ORIGIN = ORIGIN(FLASH_VERSION) + LENGTH(FLASH_VERSION), LENGTH = 32K - (LENGTH(FLASH_VECTAB) + LENGTH(FLASH_VERSION))
 }
 
 /* Sections */
@@ -49,7 +51,14 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH_VECTAB
+
+  /* The boot loader version - at a fixed address to make it possible to read it from flash. */
+  .bootloader_version :
+  {
+    . = ALIGN(4);
+ 	KEEP (*(.bootloader_info))
+  } >FLASH_VERSION
 
   /* The program code and other data into "FLASH" Rom type memory */
   .text :
