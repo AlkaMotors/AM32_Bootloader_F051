@@ -3,8 +3,14 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-//#define USE_PB4        // for iflight
+#if defined(BOOTLOADER_PB4)
+#define USE_PB4        // for iflight
+#elif defined(BOOTLOADER_PA2)
 #define USE_PA2
+#else
+#error Variant not defined
+#endif
+
 //#define USE_ADC_INPUT      // will go right to application and ignore eeprom
 
 #include <string.h>
