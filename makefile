@@ -30,9 +30,14 @@ VALUES :=  \
 	-DUSE_FULL_LL_DRIVER \
 	-DPREFETCH_ENABLE=1
 CFLAGS = $(MCU) $(VALUES) $(INCLUDES) -O2 -Wall -fdata-sections -ffunction-sections
-CFLAGS += -D$(TARGET)
+CFLAGS += -DUSE_$(TARGET)
 CFLAGS += -MMD -MP -MF $(@:%.bin=%.d)
-TARGETS := BOOTLOADER_PA2 BOOTLOADER_PB4
+
+# Targets by signal input pin:
+# PB4: iFlight
+# PA2: all others
+TARGETS := PA2 PB4
+TARGET_PREFIX := BOOTLOADER_
 
 .PHONY : clean all
 all : $(TARGETS)
@@ -40,9 +45,9 @@ clean :
 	rm -f Src/*.o
 
 $(TARGETS) :
-	$(MAKE) TARGET=$@ $@.bin
+	$(MAKE) TARGET=$@ $(TARGET_PREFIX)$@.bin
 
-$(TARGETS:%=%.bin) : clean $(OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET).elf $(OBJ)
-	$(CP) -O binary $(TARGET).elf $(TARGET).bin
-	$(CP) $(TARGET).elf -O ihex  $(TARGET).hex
+$(TARGETS:%=$(TARGET_PREFIX)%.bin) : clean $(OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET_PREFIX)$(TARGET).elf $(OBJ)
+	$(CP) -O binary $(TARGET_PREFIX)$(TARGET).elf $(TARGET_PREFIX)$(TARGET).bin
+	$(CP) $(TARGET_PREFIX)$(TARGET).elf -O ihex  $(TARGET_PREFIX)$(TARGET).hex
