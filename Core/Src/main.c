@@ -1,6 +1,6 @@
 /* Bootloader */
 
-#define BOOTLOADER_VERSION 6
+#define BOOTLOADER_VERSION 7
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdbool.h>
