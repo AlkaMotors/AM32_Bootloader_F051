@@ -61,7 +61,7 @@ typedef void (*pFunction)(void);
 #define input_port        GPIOB
 #endif
 
-
+uint16_t low_pin_count = 0;
 char receviedByte;
 int receivedCount;
 int count = 0;
@@ -546,7 +546,10 @@ int main(void)
   delayMicroseconds(1000);
 
   for(int i = 0 ; i < 1000; i ++){
-	 if( !(input_port->IDR & input_pin)){  // if the pin is low for 100ms straight there is no signal jump to application to beep
+	 if( !(input_port->IDR & input_pin)){  // if the pin is low for 10 checks out of 100 in  10ms or more its either no signal or signal. jump to application
+		 low_pin_count++;
+	 }
+	 if(low_pin_count > 10){
 		 jump();
 	 }
 	  delayMicroseconds(10);
