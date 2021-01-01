@@ -1,5 +1,5 @@
-CC := arm-none-eabi-gcc
-CP := arm-none-eabi-objcopy
+CC = $(ARM_SDK_PREFIX)gcc
+CP = $(ARM_SDK_PREFIX)objcopy
 MCU := -mcpu=cortex-m0 -mthumb
 LDSCRIPT := STM32F051K6TX_FLASH.ld
 LIBS := -lc -lm -lnosys 
@@ -32,6 +32,8 @@ VALUES :=  \
 CFLAGS = $(MCU) $(VALUES) $(INCLUDES) -O2 -Wall -fdata-sections -ffunction-sections
 CFLAGS += -DUSE_$(TARGET)
 CFLAGS += -MMD -MP -MF $(@:%.bin=%.d)
+
+ARM_SDK_PREFIX ?= arm-none-eabi-
 
 # Targets by signal input pin:
 # PB4: iFlight
