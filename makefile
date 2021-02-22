@@ -41,15 +41,19 @@ ARM_SDK_PREFIX ?= arm-none-eabi-
 TARGETS := PA2 PB4
 TARGET_PREFIX := BOOTLOADER_
 
-.PHONY : clean all
+VERSION := $(shell grep "#define BOOTLOADER_VERSION" Core/Src/main.c | awk '{print $$3}' )
+
+.PHONY : clean all version
 all : $(TARGETS)
 clean :
 	rm -f Src/*.o
+version :
+	@echo $(VERSION)
 
 $(TARGETS) :
 	$(MAKE) TARGET=$@ $(TARGET_PREFIX)$@.bin
 
 $(TARGETS:%=$(TARGET_PREFIX)%.bin) : clean $(OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET_PREFIX)$(TARGET).elf $(OBJ)
-	$(CP) -O binary $(TARGET_PREFIX)$(TARGET).elf $(TARGET_PREFIX)$(TARGET).bin
-	$(CP) $(TARGET_PREFIX)$(TARGET).elf -O ihex  $(TARGET_PREFIX)$(TARGET).hex
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET_PREFIX)$(TARGET)_$(VERSION).elf $(OBJ)
+	$(CP) -O binary $(TARGET_PREFIX)$(TARGET)_$(VERSION).elf $(TARGET_PREFIX)$(TARGET)_$(VERSION).bin
+	$(CP) $(TARGET_PREFIX)$(TARGET)_$(VERSION).elf -O ihex  $(TARGET_PREFIX)$(TARGET)_$(VERSION).hex
