@@ -3,3 +3,5 @@
 /*.bin
 /*.hex
 *.d
+downloads/
+tools/
