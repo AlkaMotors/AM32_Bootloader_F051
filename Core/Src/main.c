@@ -1,10 +1,9 @@
 /* Bootloader */
 
-#define BOOTLOADER_VERSION 7
+#define BOOTLOADER_VERSION 8
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdbool.h>
-
 #include "main.h"
 
 //#define USE_ADC_INPUT      // will go right to application and ignore eeprom
@@ -44,13 +43,15 @@ typedef void (*pFunction)(void);
 #ifdef USE_PA2
 #define input_pin     LL_GPIO_PIN_2
 #define input_port       GPIOA
-#define shift_amount       2
+#define PIN_NUMBER       2
+#define PORT_LETTER      0
 #endif
 
 #ifdef USE_PB4
 #define input_pin       LL_GPIO_PIN_4
-#define shift_amount        4
 #define input_port        GPIOB
+#define PIN_NUMBER        4
+#define PORT_LETTER       1
 #endif
 
 uint16_t low_pin_count = 0;
@@ -63,7 +64,12 @@ uint16_t address_expected_increment;
 int cmd = 0;
 char eeprom_req = 0;
 int received;
-uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x64,0x1f,0x06,0x06,0x01, 0x30};      // stm32 device info
+uint8_t port_letter;
+
+
+
+const uint8_t pin_code = PORT_LETTER << 4 | PIN_NUMBER;
+uint8_t deviceInfo[9] = {0x34,0x37,0x31,pin_code,0x1f,0x06,0x06,0x01,0x30};      // stm32 device info
 
 //uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x64,0xf3,0x90,0x06,0x01, 0x30};       // silabs device id
 //uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x64,0xe8,0xb2,0x06,0x01, 0x30};     // blheli_s identifier
@@ -425,7 +431,7 @@ delayMicroseconds(HALFBITTIME);//wait to get the center of bit time
 int bits_to_read = 0;
 while (bits_to_read < 8) {
 	delayMicroseconds(BITTIME);
-	rxbyte = rxbyte | ((( input_port->IDR & input_pin)) >> shift_amount) << bits_to_read;
+	rxbyte = rxbyte | ((( input_port->IDR & input_pin)) >> PIN_NUMBER) << bits_to_read;
   bits_to_read++;
 }
 
@@ -513,6 +519,15 @@ void recieveBuffer(){
 		decodeInput();
 }
 
+void update_EEPROM(){
+read_flash_bin(rxBuffer , EEPROM_START_ADD , 48);
+if(BOOTLOADER_VERSION != rxBuffer[2]){
+rxBuffer[2] = BOOTLOADER_VERSION;
+save_flash_nolib(rxBuffer, 48, EEPROM_START_ADD);
+}
+}
+
+
 int main(void)
 {
 
@@ -522,15 +537,13 @@ int main(void)
   LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_SYSCFG);
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
 
-
-
   FLASH->ACR |= FLASH_ACR_PRFTBE;   // prefetch buffer enable
 
   SystemClock_Config();
-
-
   MX_TIM2_Init();
   LL_TIM_EnableCounter(TIM2);
+
+  update_EEPROM(); 
 
   MX_GPIO_INPUT_INIT();     // init the pin with a pulldown
 
