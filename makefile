@@ -41,7 +41,7 @@ ARM_SDK_PREFIX ?= arm-none-eabi-
 TARGETS := PA2 PB4
 TARGET_PREFIX := BOOTLOADER_
 
-VERSION := $(shell grep "#define BOOTLOADER_VERSION" Core/Src/main.c | awk '{print $$3}' )
+VERSION := $(shell grep "\#define BOOTLOADER_VERSION" Core/Src/main.c | awk '{print $$3}' )
 
 .PHONY : clean all version
 all : $(TARGETS)
