@@ -1,6 +1,8 @@
 /* Bootloader */
 
-#define BOOTLOADER_VERSION 8
+#define BOOTLOADER_VERSION 9
+
+//#define USE_PA2
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdbool.h>
@@ -68,8 +70,8 @@ uint8_t port_letter;
 
 
 
-const uint8_t pin_code = PORT_LETTER << 4 | PIN_NUMBER;
-uint8_t deviceInfo[9] = {0x34,0x37,0x31,pin_code,0x1f,0x06,0x06,0x01,0x30};      // stm32 device info
+uint8_t pin_code = PORT_LETTER << 4 | PIN_NUMBER;
+uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x00,0x1f,0x06,0x06,0x01,0x30};      // stm32 device info
 
 //uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x64,0xf3,0x90,0x06,0x01, 0x30};       // silabs device id
 //uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x64,0xe8,0xb2,0x06,0x01, 0x30};     // blheli_s identifier
@@ -522,7 +524,10 @@ void recieveBuffer(){
 void update_EEPROM(){
 read_flash_bin(rxBuffer , EEPROM_START_ADD , 48);
 if(BOOTLOADER_VERSION != rxBuffer[2]){
-rxBuffer[2] = BOOTLOADER_VERSION;
+	if (rxBuffer[2] == 0xFF || rxBuffer[2] == 0x00){
+		return;
+	}
+	rxBuffer[2] = BOOTLOADER_VERSION;
 save_flash_nolib(rxBuffer, 48, EEPROM_START_ADD);
 }
 }
@@ -543,9 +548,7 @@ int main(void)
   MX_TIM2_Init();
   LL_TIM_EnableCounter(TIM2);
 
-  update_EEPROM(); 
-
-  MX_GPIO_INPUT_INIT();     // init the pin with a pulldown
+   MX_GPIO_INPUT_INIT();     // init the pin with a pulldown
 
   LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_DOWN);
   delayMicroseconds(1000);
@@ -566,6 +569,9 @@ int main(void)
   jump();
 
 #endif
+  deviceInfo[3] = pin_code;
+  update_EEPROM();
+
 //  sendDeviceInfo();
   while (1)
   {
