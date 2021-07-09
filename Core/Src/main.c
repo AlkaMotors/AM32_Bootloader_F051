@@ -1,8 +1,8 @@
 /* Bootloader */
 
-#define BOOTLOADER_VERSION 9
+#define BOOTLOADER_VERSION 10
 
-//#define USE_PA2
+#define USE_PA2
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdbool.h>
@@ -532,6 +532,49 @@ save_flash_nolib(rxBuffer, 48, EEPROM_START_ADD);
 }
 }
 
+void checkForSignal(){
+	//uint8_t floating_or_signal= 0;
+	  LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_DOWN);
+	  delayMicroseconds(500);
+
+	  for(int i = 0 ; i < 500; i ++){
+		 if( !(input_port->IDR & input_pin)){
+			 low_pin_count++;
+		 }else{
+		//	 high_pin_count++;
+		 }
+
+		  delayMicroseconds(10);
+	  }
+			 if(low_pin_count == 0){
+				 return;           // all high while pin is pulled low, bootloader signal
+			 }
+
+		 low_pin_count = 0;
+
+		 LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_NO);
+		 delayMicroseconds(500);
+
+		 for(int i = 0 ; i < 500; i ++){
+		 if( !(input_port->IDR & input_pin)){
+			 low_pin_count++;
+		 }
+
+		  delayMicroseconds(10);
+	  }
+		 if(low_pin_count == 0){
+			 return;            // when floated all
+		 }
+
+		 if(low_pin_count > 0){
+			 jump();
+		 }
+
+
+
+}
+
+
 
 int main(void)
 {
@@ -550,21 +593,8 @@ int main(void)
 
    MX_GPIO_INPUT_INIT();     // init the pin with a pulldown
 
-  LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_DOWN);
-  delayMicroseconds(1000);
-
-  for(int i = 0 ; i < 1000; i ++){
-	 if( !(input_port->IDR & input_pin)){  // if the pin is low for 10 checks out of 100 in  10ms or more its either no signal or signal. jump to application
-		 low_pin_count++;
-	 }
-	 if(low_pin_count > 10){
-		 jump();
-	 }
-	  delayMicroseconds(10);
-  }
-
-  LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_UP);
-
+   checkForSignal();
+   LL_GPIO_SetPinPull(input_port, input_pin, LL_GPIO_PULL_UP);
   #ifdef USE_ADC_INPUT  // go right to application
   jump();
 
